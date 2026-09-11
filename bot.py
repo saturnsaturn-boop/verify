@@ -20,8 +20,8 @@ EMBED_COLOR = discord.Color.from_rgb(144, 238, 144)
 
 # Verification embed title
 EMBED_TITLE = (
-    "🇻​🇪​🇷​🇮​🇫​🇾​ 🇹​🇴​ 🇬​🇦​🇮​🇳​ 🇦​🇨​🇨​🇪​🇸​ 🇹​🇴​ 🇷​🇪​🇸​🇹​ "
-    "🇴​🇫​ 🇹​🇭​🇪​ 🇨​🇭​🇦​🇳​🇳​🇪​🇱​🇸​ — ᨳଓ ."
+    "𝐕𝐄𝐑𝐈𝐅𝐘 𝐓𝐎 𝐆𝐀𝐈𝐍 𝐀𝐂𝐂𝐄𝐒𝐒 𝐓𝐎 𝐑𝐄𝐒𝐓 𝐎𝐅 "
+    "𝐓𝐇𝐄 𝐂𝐇𝐀𝐍𝐍𝐄𝐋𝐒 — ᨳଓ ."
 )
 
 # Verification embed description
