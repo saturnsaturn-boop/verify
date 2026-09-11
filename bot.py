@@ -5,9 +5,10 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
-# --------------------------------------------------
+
+# ============================================================
 # CONFIG
-# --------------------------------------------------
+# ============================================================
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 
@@ -30,7 +31,7 @@ IMAGE_URL = (
     "hm=afefd3310a432a04cff76dc592a2cb928806d9ff10b2e000b8706e88ad9b77cf&"
 )
 
-# Channels containing these words in their name will NOT be modified
+# Channels with these words will be skipped by /setup verify
 STAFF_KEYWORDS = (
     "staff",
     "admin",
@@ -39,9 +40,10 @@ STAFF_KEYWORDS = (
     "moderator",
 )
 
-# --------------------------------------------------
+
+# ============================================================
 # LOGGING
-# --------------------------------------------------
+# ============================================================
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,18 +53,21 @@ logging.basicConfig(
 logger = logging.getLogger("verify-bot")
 
 
-# --------------------------------------------------
+# ============================================================
 # INTENTS
-# --------------------------------------------------
+# ============================================================
 
 intents = discord.Intents.default()
-intents.guilds = True
+
+# Needed so the bot can work with members and roles
 intents.members = True
 
+# Message content is NOT needed because we use slash commands.
 
-# --------------------------------------------------
+
+# ============================================================
 # BOT
-# --------------------------------------------------
+# ============================================================
 
 class VerifyBot(commands.Bot):
 
@@ -73,19 +78,20 @@ class VerifyBot(commands.Bot):
         )
 
     async def setup_hook(self):
+
         await self.tree.sync()
+
         logger.info("Slash commands synced.")
 
 
 bot = VerifyBot()
 
 
-# --------------------------------------------------
+# ============================================================
 # HELPERS
-# --------------------------------------------------
+# ============================================================
 
-def is_staff_channel(channel: discord.abc.GuildChannel) -> bool:
-    """Returns True if the channel looks like a staff-only channel."""
+def is_staff_channel(channel):
 
     name = channel.name.lower()
 
@@ -95,7 +101,8 @@ def is_staff_channel(channel: discord.abc.GuildChannel) -> bool:
     )
 
 
-def build_verify_embed() -> discord.Embed:
+def build_verify_embed():
+
     embed = discord.Embed(
         title=EMBED_TITLE,
         description=EMBED_DESCRIPTION,
@@ -107,14 +114,17 @@ def build_verify_embed() -> discord.Embed:
     return embed
 
 
-# --------------------------------------------------
+# ============================================================
 # VERIFY BUTTON
-# --------------------------------------------------
+# ============================================================
 
 class VerifyView(discord.ui.View):
 
     def __init__(self):
-        super().__init__(timeout=None)
+
+        super().__init__(
+            timeout=None
+        )
 
     @discord.ui.button(
         label="♡",
@@ -128,63 +138,87 @@ class VerifyView(discord.ui.View):
     ):
 
         if interaction.guild is None:
+
+            await interaction.response.send_message(
+                "❌ This button can only be used inside a server.",
+                ephemeral=True,
+            )
+
             return
 
-        role = interaction.guild.get_role(VERIFY_ROLE_ID)
+        role = interaction.guild.get_role(
+            VERIFY_ROLE_ID
+        )
 
         if role is None:
+
             await interaction.response.send_message(
                 "❌ I couldn't find the verification role.",
                 ephemeral=True,
             )
+
             return
 
         member = interaction.user
 
+        # Already verified
         if role in member.roles:
+
             await interaction.response.send_message(
                 "♡ You are already verified!",
                 ephemeral=True,
             )
+
             return
 
         try:
+
             await member.add_roles(
                 role,
-                reason="User verified through verification panel",
+                reason="Verified through verification panel",
             )
 
         except discord.Forbidden:
+
             await interaction.response.send_message(
-                "❌ I don't have permission to give you the verification role. "
-                "Please make sure my bot role is above the verification role.",
+                "❌ I can't give you the verification role.\n\n"
+                "Make sure my bot role is ABOVE the verification role.",
                 ephemeral=True,
             )
+
             return
 
-        except discord.HTTPException:
+        except discord.HTTPException as error:
+
+            logger.error(
+                "Error giving verification role: %s",
+                error,
+            )
+
             await interaction.response.send_message(
-                "❌ Discord returned an error while verifying you. "
-                "Please try again.",
+                "❌ Discord returned an error. Please try again.",
                 ephemeral=True,
             )
+
             return
 
         await interaction.response.send_message(
-            "♡ You are now verified! You should have access to the server channels.",
+            "♡ You are now verified! You should have access to the server.",
             ephemeral=True,
         )
 
 
-# --------------------------------------------------
-# READY
-# --------------------------------------------------
+# ============================================================
+# BOT READY
+# ============================================================
 
 @bot.event
 async def on_ready():
 
-    # Persistent button
-    bot.add_view(VerifyView())
+    # Keep the verification button working after restarts
+    bot.add_view(
+        VerifyView()
+    )
 
     logger.info(
         "Logged in as %s (%s)",
@@ -193,73 +227,114 @@ async def on_ready():
     )
 
 
-# --------------------------------------------------
-# /SEND VERIFY PANEL
-# --------------------------------------------------
+# ============================================================
+# CHANNEL SELECT
+# ============================================================
 
-class VerifyPanelChannelSelect(discord.ui.ChannelSelect):
+class VerifyPanelChannelSelect(
+    discord.ui.ChannelSelect
+):
 
     def __init__(self):
+
         super().__init__(
-            placeholder="Choose the channel for the verification panel...",
+            placeholder="Choose the verification channel...",
+
             channel_types=[
                 discord.ChannelType.text,
             ],
+
             min_values=1,
             max_values=1,
         )
 
-    async def callback(self, interaction: discord.Interaction):
+    async def callback(
+        self,
+        interaction: discord.Interaction,
+    ):
+
+        # ====================================================
+        # IMPORTANT FIX:
+        # Respond immediately so Discord doesn't timeout.
+        # ====================================================
+
+        await interaction.response.defer(
+            ephemeral=True
+        )
 
         channel = self.values[0]
 
-        embed = build_verify_embed()
+        logger.info(
+            "Sending verification panel to #%s",
+            channel.name,
+        )
 
         try:
+
             await channel.send(
-                embed=embed,
+                embed=build_verify_embed(),
                 view=VerifyView(),
             )
 
         except discord.Forbidden:
-            await interaction.response.edit_message(
-                content=(
-                    f"❌ I can't send messages in {channel.mention}.\n"
-                    "Please give me permission to view and send messages there."
-                ),
-                view=None,
+
+            await interaction.followup.send(
+                f"❌ I can't send messages in {channel.mention}.\n\n"
+                "Make sure the bot has:\n"
+                "• View Channel\n"
+                "• Send Messages\n"
+                "• Embed Links",
+
+                ephemeral=True,
             )
+
             return
 
-        except discord.HTTPException:
-            await interaction.response.edit_message(
-                content="❌ Discord returned an error while sending the panel.",
-                view=None,
+        except discord.HTTPException as error:
+
+            logger.error(
+                "Failed to send verification panel: %s",
+                error,
             )
+
+            await interaction.followup.send(
+                "❌ Discord returned an error while sending the panel.",
+                ephemeral=True,
+            )
+
             return
 
-        await interaction.response.edit_message(
-            content=(
-                f"✅ Verification panel sent successfully to {channel.mention}!"
-            ),
-            view=None,
+        await interaction.followup.send(
+            f"✅ Verification panel sent to {channel.mention}!",
+            ephemeral=True,
         )
 
 
-class VerifyPanelSelectView(discord.ui.View):
+class VerifyPanelSelectView(
+    discord.ui.View
+):
 
     def __init__(self):
-        super().__init__(timeout=60)
 
-        self.add_item(VerifyPanelChannelSelect())
+        super().__init__(
+            timeout=60
+        )
 
+        self.add_item(
+            VerifyPanelChannelSelect()
+        )
+
+
+# ============================================================
+# /SEND VERIFY PANEL
+# ============================================================
 
 @bot.tree.command(
     name="send",
     description="Send a verification panel.",
 )
 @app_commands.describe(
-    action="Choose what you want to send.",
+    action="What do you want to send?",
 )
 @app_commands.choices(
     action=[
@@ -269,36 +344,40 @@ class VerifyPanelSelectView(discord.ui.View):
         ),
     ]
 )
-@app_commands.checks.has_permissions(administrator=True)
+@app_commands.checks.has_permissions(
+    administrator=True
+)
 async def send(
     interaction: discord.Interaction,
     action: app_commands.Choice[str],
 ):
 
     if action.value != "verify_panel":
+
         await interaction.response.send_message(
             "❌ Invalid option.",
             ephemeral=True,
         )
+
         return
 
     await interaction.response.send_message(
-        "Choose the channel where you want me to send the verification panel:",
+        "Choose the channel where you want the verification panel:",
         view=VerifyPanelSelectView(),
         ephemeral=True,
     )
 
 
-# --------------------------------------------------
+# ============================================================
 # /SETUP VERIFY
-# --------------------------------------------------
+# ============================================================
 
 @bot.tree.command(
     name="setup",
     description="Set up the verification system.",
 )
 @app_commands.describe(
-    action="Choose what you want to set up.",
+    action="What do you want to set up?",
 )
 @app_commands.choices(
     action=[
@@ -308,150 +387,191 @@ async def send(
         ),
     ]
 )
-@app_commands.checks.has_permissions(administrator=True)
+@app_commands.checks.has_permissions(
+    administrator=True
+)
 async def setup(
     interaction: discord.Interaction,
     action: app_commands.Choice[str],
 ):
 
     if action.value != "verify":
+
         await interaction.response.send_message(
             "❌ Invalid option.",
             ephemeral=True,
         )
+
         return
 
-    await interaction.response.defer(ephemeral=True)
+    # Respond immediately
+    await interaction.response.defer(
+        ephemeral=True
+    )
 
     guild = interaction.guild
 
     if guild is None:
+
         await interaction.followup.send(
-            "❌ This command can only be used inside a server.",
+            "❌ This command must be used inside a server.",
             ephemeral=True,
         )
+
         return
 
-    role = guild.get_role(VERIFY_ROLE_ID)
+    role = guild.get_role(
+        VERIFY_ROLE_ID
+    )
 
     if role is None:
+
         await interaction.followup.send(
-            (
-                "❌ I couldn't find the verification role.\n\n"
-                f"Role ID: `{VERIFY_ROLE_ID}`"
-            ),
+            f"❌ I couldn't find the verification role.\n\n"
+            f"Role ID: `{VERIFY_ROLE_ID}`",
             ephemeral=True,
         )
+
         return
 
-    # Check bot role hierarchy
     bot_member = guild.me
 
     if bot_member is None:
+
         await interaction.followup.send(
-            "❌ I couldn't find my bot member in this server.",
+            "❌ I couldn't find my bot member.",
             ephemeral=True,
         )
+
         return
 
+    # ========================================================
+    # ROLE HIERARCHY CHECK
+    # ========================================================
+
     if role >= bot_member.top_role:
+
         await interaction.followup.send(
-            (
-                "❌ My bot role must be **above** the verification role.\n\n"
-                "Go to Server Settings → Roles and move my bot role "
-                "above the verification role."
-            ),
+            "❌ **Role hierarchy problem!**\n\n"
+            "Move the bot's role ABOVE the verification role.\n\n"
+            "It should look like:\n"
+            "🤖 Bot Role\n"
+            "✅ Verification Role\n"
+            "👤 @everyone",
+
             ephemeral=True,
         )
+
         return
 
     everyone = guild.default_role
 
-    changed_channels = 0
-    skipped_channels = 0
-    failed_channels = 0
+    changed = 0
+    skipped = 0
+    failed = 0
 
-    # --------------------------------------------------
-    # CONFIGURE CATEGORIES FIRST
-    # --------------------------------------------------
+    # ========================================================
+    # CATEGORIES
+    # ========================================================
 
     for category in guild.categories:
 
         if is_staff_channel(category):
-            skipped_channels += 1
+
+            skipped += 1
             continue
 
         try:
 
+            # Hide category from unverified users
             await category.set_permissions(
                 everyone,
                 view_channel=False,
                 reason="Verification system setup",
             )
 
+            # Give verified users access
             await category.set_permissions(
                 role,
                 view_channel=True,
                 reason="Verification system setup",
             )
 
-            changed_channels += 1
+            changed += 1
 
         except discord.Forbidden:
-            failed_channels += 1
+
+            failed += 1
+
+            logger.warning(
+                "No permission to edit category: %s",
+                category.name,
+            )
 
         except discord.HTTPException:
-            failed_channels += 1
 
-    # --------------------------------------------------
-    # CONFIGURE CHANNELS
-    # --------------------------------------------------
+            failed += 1
+
+    # ========================================================
+    # CHANNELS
+    # ========================================================
 
     for channel in guild.channels:
 
-        if isinstance(channel, discord.CategoryChannel):
-            continue
-
-        # Don't lock the channel where setup command was used
-        # if it is the current interaction channel.
-        if (
-            isinstance(channel, discord.TextChannel)
-            and channel.id == interaction.channel_id
+        # Don't process categories again
+        if isinstance(
+            channel,
+            discord.CategoryChannel
         ):
-            skipped_channels += 1
+
             continue
 
+        # Don't lock the channel where the command was run
+        if channel.id == interaction.channel_id:
+
+            skipped += 1
+            continue
+
+        # Skip staff channels
         if is_staff_channel(channel):
-            skipped_channels += 1
+
+            skipped += 1
             continue
 
         try:
 
-            # Hide from unverified users
+            # Hide from @everyone
             await channel.set_permissions(
                 everyone,
                 view_channel=False,
                 reason="Verification system setup",
             )
 
-            # Allow verified users
+            # Give verified role access
             await channel.set_permissions(
                 role,
                 view_channel=True,
                 reason="Verification system setup",
             )
 
-            changed_channels += 1
+            changed += 1
 
         except discord.Forbidden:
-            failed_channels += 1
+
+            failed += 1
+
+            logger.warning(
+                "No permission to edit channel: %s",
+                channel.name,
+            )
 
         except discord.HTTPException:
-            failed_channels += 1
 
-    # --------------------------------------------------
-    # SUMMARY
-    # --------------------------------------------------
+            failed += 1
+
+    # ========================================================
+    # RESULT
+    # ========================================================
 
     embed = discord.Embed(
         title="♡ Verification Setup Complete",
@@ -459,22 +579,19 @@ async def setup(
     )
 
     embed.description = (
-        "I configured the server's channel permissions for verification.\n\n"
-        f"**Verification role:** {role.mention}\n"
-        f"**Channels/categories changed:** `{changed_channels}`\n"
-        f"**Skipped:** `{skipped_channels}`\n"
-        f"**Failed:** `{failed_channels}`\n\n"
-        "Unverified members will be unable to view the configured channels, "
-        "while members with the verification role will be able to view them."
+        f"**Verification role:** {role.mention}\n\n"
+        f"✅ **Changed:** `{changed}`\n"
+        f"⏭️ **Skipped:** `{skipped}`\n"
+        f"❌ **Failed:** `{failed}`"
     )
 
-    if failed_channels > 0:
+    if failed > 0:
+
         embed.add_field(
-            name="⚠️ Some channels failed",
+            name="⚠️ Some channels could not be changed",
             value=(
-                "This usually means the bot doesn't have **Manage Channels** "
-                "permission or another permission/Discord hierarchy issue "
-                "prevented the change."
+                "Make sure the bot has **Manage Channels** "
+                "permission."
             ),
             inline=False,
         )
@@ -485,9 +602,9 @@ async def setup(
     )
 
 
-# --------------------------------------------------
-# ERROR HANDLING
-# --------------------------------------------------
+# ============================================================
+# COMMAND ERROR HANDLING
+# ============================================================
 
 @send.error
 async def send_error(
@@ -495,12 +612,17 @@ async def send_error(
     error: app_commands.AppCommandError,
 ):
 
-    if isinstance(error, app_commands.MissingPermissions):
+    if isinstance(
+        error,
+        app_commands.MissingPermissions
+    ):
 
-        await interaction.response.send_message(
-            "❌ You need Administrator permission to use this command.",
-            ephemeral=True,
-        )
+        if not interaction.response.is_done():
+
+            await interaction.response.send_message(
+                "❌ You need Administrator permission to use this command.",
+                ephemeral=True,
+            )
 
     else:
 
@@ -510,6 +632,7 @@ async def send_error(
         )
 
         if not interaction.response.is_done():
+
             await interaction.response.send_message(
                 "❌ Something went wrong.",
                 ephemeral=True,
@@ -522,12 +645,17 @@ async def setup_error(
     error: app_commands.AppCommandError,
 ):
 
-    if isinstance(error, app_commands.MissingPermissions):
+    if isinstance(
+        error,
+        app_commands.MissingPermissions
+    ):
 
-        await interaction.response.send_message(
-            "❌ You need Administrator permission to use this command.",
-            ephemeral=True,
-        )
+        if not interaction.response.is_done():
+
+            await interaction.response.send_message(
+                "❌ You need Administrator permission to use this command.",
+                ephemeral=True,
+            )
 
     else:
 
@@ -537,19 +665,22 @@ async def setup_error(
         )
 
         if not interaction.response.is_done():
+
             await interaction.response.send_message(
                 "❌ Something went wrong.",
                 ephemeral=True,
             )
 
 
-# --------------------------------------------------
-# START
-# --------------------------------------------------
+# ============================================================
+# START BOT
+# ============================================================
 
 if not TOKEN:
+
     raise RuntimeError(
         "DISCORD_TOKEN environment variable is missing."
     )
+
 
 bot.run(TOKEN)
