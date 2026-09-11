@@ -1,4 +1,3 @@
-```python
 import os
 import logging
 
@@ -554,4 +553,3 @@ if not TOKEN:
     )
 
 bot.run(TOKEN)
-```
