@@ -1,6 +1,5 @@
 import os
 import logging
-
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -12,22 +11,22 @@ from discord import app_commands
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-# Your verification role
+# Verification role ID
 VERIFY_ROLE_ID = 1543128981413568595
 
-# Light green
+# Light green embed
 EMBED_COLOR = discord.Color.from_rgb(144, 238, 144)
 
-# Verification embed title
+# Clean bold title
 EMBED_TITLE = (
     "𝐕𝐄𝐑𝐈𝐅𝐘 𝐓𝐎 𝐆𝐀𝐈𝐍 𝐀𝐂𝐂𝐄𝐒𝐒 𝐓𝐎 𝐑𝐄𝐒𝐓 𝐎𝐅 "
     "𝐓𝐇𝐄 𝐂𝐇𝐀𝐍𝐍𝐄𝐋𝐒 — ᨳଓ ."
 )
 
-# Verification embed description
+# Embed description
 EMBED_DESCRIPTION = "verify"
 
-# Your verification image
+# Your image
 IMAGE_URL = (
     "https://cdn.discordapp.com/attachments/"
     "1542776803867758602/1547851068602585159/"
@@ -36,8 +35,7 @@ IMAGE_URL = (
     "hm=afefd3310a432a04cff76dc592a2cb928806d9ff10b2e000b8706e88ad9b77cf&"
 )
 
-# Channels containing these words will be skipped
-# by /setup verify.
+# These channels/categories are skipped by setup
 STAFF_KEYWORDS = (
     "staff",
     "admin",
@@ -56,20 +54,19 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s",
 )
 
-logger = logging.getLogger("verify-bot")
+logger = logging.getLogger("verification-bot")
 
 
 # ============================================================
-# DISCORD INTENTS
+# INTENTS
 # ============================================================
 
 intents = discord.Intents.default()
 
-# Required for working with server members/roles.
+# Needed for members/roles
 intents.members = True
 
 # Message Content Intent is NOT required.
-# This bot uses slash commands.
 
 
 # ============================================================
@@ -79,7 +76,6 @@ intents.members = True
 class VerifyBot(commands.Bot):
 
     def __init__(self):
-
         super().__init__(
             command_prefix="!",
             intents=intents,
@@ -96,12 +92,13 @@ bot = VerifyBot()
 
 
 # ============================================================
-# HELPER FUNCTIONS
+# HELPERS
 # ============================================================
 
 def is_staff_channel(channel):
     """
-    Checks whether a channel/category looks like a staff channel.
+    Returns True if the channel/category name looks like
+    a staff/admin/mod channel.
     """
 
     name = channel.name.lower()
@@ -113,9 +110,6 @@ def is_staff_channel(channel):
 
 
 def build_verify_embed():
-    """
-    Creates the verification embed.
-    """
 
     embed = discord.Embed(
         title=EMBED_TITLE,
@@ -138,7 +132,7 @@ class VerifyView(discord.ui.View):
 
     def __init__(self):
 
-        # None = button never expires
+        # Never expires
         super().__init__(
             timeout=None
         )
@@ -146,25 +140,25 @@ class VerifyView(discord.ui.View):
     @discord.ui.button(
         label="♡",
         style=discord.ButtonStyle.success,
-        custom_id="verify_button",
+        custom_id="verification_button",
     )
-    async def verify_button(
+    async def verify(
         self,
         interaction: discord.Interaction,
         button: discord.ui.Button,
     ):
 
-        # Make sure this is being used inside a server
+        # Make sure this is a server
         if interaction.guild is None:
 
             await interaction.response.send_message(
-                "❌ This button can only be used inside a server.",
+                "❌ This button can only be used in a server.",
                 ephemeral=True,
             )
 
             return
 
-        # Find verification role
+        # Get verification role
         role = interaction.guild.get_role(
             VERIFY_ROLE_ID
         )
@@ -190,19 +184,19 @@ class VerifyView(discord.ui.View):
 
             return
 
-        # Give the role
+        # Give verification role
         try:
 
             await member.add_roles(
                 role,
-                reason="Verified through verification panel",
+                reason="User verified through verification panel",
             )
 
         except discord.Forbidden:
 
             await interaction.response.send_message(
                 "❌ I can't give you the verification role.\n\n"
-                "Make sure my bot role is ABOVE the verification role.",
+                "Make sure the bot's role is ABOVE the verification role.",
                 ephemeral=True,
             )
 
@@ -211,7 +205,7 @@ class VerifyView(discord.ui.View):
         except discord.HTTPException as error:
 
             logger.error(
-                "Failed to give verification role: %s",
+                "Error giving verification role: %s",
                 error,
             )
 
@@ -222,9 +216,9 @@ class VerifyView(discord.ui.View):
 
             return
 
-        # Successful verification
+        # Success
         await interaction.response.send_message(
-            "♡ You are now verified! You should have access to the server.",
+            "♡ You are now verified! You should now have access to the channels.",
             ephemeral=True,
         )
 
@@ -236,13 +230,13 @@ class VerifyView(discord.ui.View):
 @bot.event
 async def on_ready():
 
-    # Register persistent verification button
+    # Register persistent button
     bot.add_view(
         VerifyView()
     )
 
     logger.info(
-        "Bot is online as %s (%s)",
+        "Bot online as %s (%s)",
         bot.user,
         bot.user.id,
     )
@@ -277,7 +271,7 @@ async def send(
     channel: discord.TextChannel,
 ):
 
-    # Make sure correct action was selected
+    # Check action
     if action.value != "verify_panel":
 
         await interaction.response.send_message(
@@ -287,20 +281,13 @@ async def send(
 
         return
 
-    # ========================================================
-    # RESPOND IMMEDIATELY
-    # ========================================================
-    # This prevents the "didn't respond in time" error.
-
+    # Respond immediately
     await interaction.response.send_message(
-        f"⏳ Sending the verification panel to {channel.mention}...",
+        f"⏳ Sending verification panel to {channel.mention}...",
         ephemeral=True,
     )
 
-    # ========================================================
-    # SEND PANEL
-    # ========================================================
-
+    # Send panel
     try:
 
         await channel.send(
@@ -312,9 +299,8 @@ async def send(
 
         await interaction.edit_original_response(
             content=(
-                f"❌ I can't send the verification panel to "
-                f"{channel.mention}.\n\n"
-                "Make sure the bot has:\n"
+                f"❌ I can't send messages in {channel.mention}.\n\n"
+                "Make sure I have:\n"
                 "• View Channel\n"
                 "• Send Messages\n"
                 "• Embed Links"
@@ -332,21 +318,16 @@ async def send(
 
         await interaction.edit_original_response(
             content=(
-                "❌ Discord returned an error while sending "
-                "the verification panel."
+                "❌ Discord returned an error while sending the panel."
             )
         )
 
         return
 
-    # ========================================================
-    # SUCCESS
-    # ========================================================
-
+    # Success
     await interaction.edit_original_response(
         content=(
-            f"✅ Verification panel successfully sent to "
-            f"{channel.mention}! ♡"
+            f"✅ Verification panel sent to {channel.mention}! ♡"
         )
     )
 
@@ -387,7 +368,7 @@ async def setup(
 
         return
 
-    # Respond immediately
+    # Respond before doing permission changes
     await interaction.response.defer(
         ephemeral=True
     )
@@ -404,7 +385,7 @@ async def setup(
         return
 
     # ========================================================
-    # FIND VERIFICATION ROLE
+    # FIND ROLE
     # ========================================================
 
     role = guild.get_role(
@@ -414,7 +395,7 @@ async def setup(
     if role is None:
 
         await interaction.followup.send(
-            f"❌ I couldn't find the verification role.\n\n"
+            "❌ I couldn't find the verification role.\n\n"
             f"Role ID: `{VERIFY_ROLE_ID}`",
             ephemeral=True,
         )
@@ -430,14 +411,14 @@ async def setup(
     if bot_member is None:
 
         await interaction.followup.send(
-            "❌ I couldn't find my bot member.",
+            "❌ I couldn't find the bot in this server.",
             ephemeral=True,
         )
 
         return
 
     # ========================================================
-    # ROLE HIERARCHY
+    # ROLE POSITION
     # ========================================================
 
     if role >= bot_member.top_role:
@@ -445,7 +426,7 @@ async def setup(
         await interaction.followup.send(
             "❌ **Role hierarchy problem!**\n\n"
             "Move the bot's role ABOVE the verification role.\n\n"
-            "It needs to look like:\n\n"
+            "It should look like:\n\n"
             "🤖 Bot Role\n"
             "✅ Verification Role\n"
             "👤 @everyone",
@@ -461,56 +442,66 @@ async def setup(
     failed = 0
 
     # ========================================================
-    # CONFIGURE CATEGORIES
+    # CATEGORIES
     # ========================================================
 
     for category in guild.categories:
 
-        # Don't touch obvious staff categories
+        # Skip staff categories
         if is_staff_channel(category):
 
             skipped += 1
-
             continue
 
         try:
 
-            # Hide from @everyone
+            # Hide category from @everyone
             await category.set_permissions(
                 everyone,
                 view_channel=False,
-                reason="Verification system setup",
+                reason="Verification setup",
             )
 
-            # Give verified users access
+            # Allow verification role
             await category.set_permissions(
                 role,
                 view_channel=True,
-                reason="Verification system setup",
+                reason="Verification setup",
             )
 
             changed += 1
+
+            logger.info(
+                "Configured category: %s",
+                category.name,
+            )
 
         except discord.Forbidden:
 
             failed += 1
 
             logger.warning(
-                "Cannot edit category: %s",
+                "No permission to edit category: %s",
                 category.name,
             )
 
-        except discord.HTTPException:
+        except discord.HTTPException as error:
 
             failed += 1
 
+            logger.warning(
+                "Discord error editing category %s: %s",
+                category.name,
+                error,
+            )
+
     # ========================================================
-    # CONFIGURE CHANNELS
+    # CHANNELS
     # ========================================================
 
     for channel in guild.channels:
 
-        # Skip categories because we already handled them
+        # Categories already handled
         if isinstance(
             channel,
             discord.CategoryChannel
@@ -522,49 +513,76 @@ async def setup(
         if channel.id == interaction.channel_id:
 
             skipped += 1
-
             continue
 
-        # Don't touch staff channels
+        # Skip staff channels
         if is_staff_channel(channel):
 
             skipped += 1
-
             continue
 
         try:
 
-            # Hide from unverified users
-            await channel.set_permissions(
-                everyone,
-                view_channel=False,
-                reason="Verification system setup",
+            # ------------------------------------------------
+            # @EVERYONE
+            # ------------------------------------------------
+
+            everyone_overwrite = (
+                channel.overwrites_for(everyone)
             )
 
-            # Give verified users access
+            everyone_overwrite.view_channel = False
+
+            await channel.set_permissions(
+                everyone,
+                overwrite=everyone_overwrite,
+                reason="Verification setup - hide unverified",
+            )
+
+            # ------------------------------------------------
+            # VERIFICATION ROLE
+            # ------------------------------------------------
+
+            verify_overwrite = (
+                channel.overwrites_for(role)
+            )
+
+            verify_overwrite.view_channel = True
+
             await channel.set_permissions(
                 role,
-                view_channel=True,
-                reason="Verification system setup",
+                overwrite=verify_overwrite,
+                reason="Verification setup - allow verified",
             )
 
             changed += 1
+
+            logger.info(
+                "Configured channel: #%s",
+                channel.name,
+            )
 
         except discord.Forbidden:
 
             failed += 1
 
             logger.warning(
-                "Cannot edit channel: %s",
+                "No permission to edit channel: %s",
                 channel.name,
             )
 
-        except discord.HTTPException:
+        except discord.HTTPException as error:
 
             failed += 1
 
+            logger.warning(
+                "Discord error editing #%s: %s",
+                channel.name,
+                error,
+            )
+
     # ========================================================
-    # SETUP RESULT
+    # RESULT
     # ========================================================
 
     embed = discord.Embed(
@@ -573,19 +591,20 @@ async def setup(
     )
 
     embed.description = (
-        f"**Verification role:** {role.mention}\n\n"
+        "The verification permissions have been configured.\n\n"
         f"✅ **Changed:** `{changed}`\n"
         f"⏭️ **Skipped:** `{skipped}`\n"
-        f"❌ **Failed:** `{failed}`"
+        f"❌ **Failed:** `{failed}`\n\n"
+        f"**Verification role:** {role.mention}"
     )
 
     if failed > 0:
 
         embed.add_field(
-            name="⚠️ Some channels could not be changed",
+            name="⚠️ Some channels failed",
             value=(
-                "Make sure the bot has **Manage Channels** "
-                "permission."
+                "Make sure the bot has **Administrator** permission "
+                "or at least **Manage Channels**."
             ),
             inline=False,
         )
@@ -597,7 +616,7 @@ async def setup(
 
 
 # ============================================================
-# ERROR HANDLING
+# SEND ERROR
 # ============================================================
 
 @send.error
@@ -628,10 +647,14 @@ async def send_error(
         if not interaction.response.is_done():
 
             await interaction.response.send_message(
-                "❌ Something went wrong.",
+                "❌ Something went wrong while running /send.",
                 ephemeral=True,
             )
 
+
+# ============================================================
+# SETUP ERROR
+# ============================================================
 
 @setup.error
 async def setup_error(
@@ -661,13 +684,13 @@ async def setup_error(
         if not interaction.response.is_done():
 
             await interaction.response.send_message(
-                "❌ Something went wrong.",
+                "❌ Something went wrong while running /setup.",
                 ephemeral=True,
             )
 
 
 # ============================================================
-# START BOT
+# START
 # ============================================================
 
 if not TOKEN:
