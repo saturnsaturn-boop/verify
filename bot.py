@@ -31,7 +31,9 @@ EMBED_DESCRIPTION = "verify"
 
 # Your verification image
 IMAGE_URL = (
-    "https://cdn.discordapp.com/attachments/1542776803867758602/1548570076016414803/76aeab5311fc9f53643499877bf82b3b.jpg?ex=6aa789c5&is=6aa63845&hm=f2c5e20ba571a1a45efe383814ec3a2da1447d967b067ce6bde8b70a77794c48&"
+    "https://cdn.discordapp.com/attachments/1542776803867758602/"
+    "1548570076016414803/76aeab5311fc9f53643499877bf82b3b.jpg"
+    "?ex=6aa789c5&is=6aa63845&hm=f2c5e20ba571a1a45efe383814ec3a2da1447d967b067ce6bde8b70a77794c48&"
 )
 
 
