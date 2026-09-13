@@ -17,7 +17,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 # Your verification role
 VERIFY_ROLE_ID = 1543128981413568595
 
-# Light green
+# Embed color
 EMBED_COLOR = discord.Color.from_rgb(255, 255, 255)
 
 # Verification panel title
@@ -35,6 +35,9 @@ IMAGE_URL = (
     "1548570076016414803/76aeab5311fc9f53643499877bf82b3b.jpg"
     "?ex=6aa789c5&is=6aa63845&hm=f2c5e20ba571a1a45efe383814ec3a2da1447d967b067ce6bde8b70a77794c48&"
 )
+
+# Verification embed footer
+EMBED_FOOTER = "♡ verification system"
 
 
 # ============================================================
@@ -89,7 +92,7 @@ class VerifyBot(commands.Bot):
 
     async def setup_hook(self):
 
-        # Register the persistent verification button.
+        # Register the persistent verification buttons.
         self.add_view(
             VerifyView()
         )
@@ -135,21 +138,29 @@ def build_verify_embed():
         url=IMAGE_URL
     )
 
+    embed.set_footer(
+        text=EMBED_FOOTER
+    )
+
     return embed
 
 
 # ============================================================
-# VERIFICATION BUTTON
+# VERIFICATION BUTTONS
 # ============================================================
 
 class VerifyView(discord.ui.View):
 
     def __init__(self):
 
-        # None means the button never expires.
+        # None means the buttons never expire.
         super().__init__(
             timeout=None
         )
+
+    # ========================================================
+    # VERIFY BUTTON
+    # ========================================================
 
     @discord.ui.button(
         label="♡",
@@ -204,7 +215,7 @@ class VerifyView(discord.ui.View):
         if role in member.roles:
 
             await interaction.response.send_message(
-                " You are already verified ♡!",
+                "You are already verified ♡!",
                 ephemeral=True,
             )
 
@@ -251,6 +262,56 @@ class VerifyView(discord.ui.View):
 
         await interaction.response.send_message(
             "♡ **Verified!** You now have access to the server channels.",
+            ephemeral=True,
+        )
+
+    # ========================================================
+    # VERIFICATION COUNT BUTTON
+    # ========================================================
+
+    @discord.ui.button(
+        label="How many people are verified?",
+        style=discord.ButtonStyle.secondary,
+        custom_id="verification_count_button",
+    )
+    async def verification_count_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+
+        # Must be used inside a server.
+        if interaction.guild is None:
+
+            await interaction.response.send_message(
+                "❌ This button can only be used inside a server.",
+                ephemeral=True,
+            )
+
+            return
+
+        guild = interaction.guild
+
+        # Find verification role.
+        role = guild.get_role(
+            VERIFY_ROLE_ID
+        )
+
+        if role is None:
+
+            await interaction.response.send_message(
+                "❌ I couldn't find the verification role.",
+                ephemeral=True,
+            )
+
+            return
+
+        # Count members who have the verification role.
+        verified_count = len(role.members)
+
+        await interaction.response.send_message(
+            f"There are currently **{verified_count}** verified "
+            f"in **{guild.name}** ♡",
             ephemeral=True,
         )
 
@@ -314,12 +375,6 @@ async def send(
     # ========================================================
     # RESPOND IMMEDIATELY
     # ========================================================
-    #
-    # This is important because it prevents:
-    #
-    # "Application did not respond"
-    #
-    # ========================================================
 
     await interaction.response.send_message(
         f"⏳ Setting up {channel.mention}...",
@@ -328,12 +383,6 @@ async def send(
 
     # ========================================================
     # MAKE PANEL CHANNEL VISIBLE
-    # ========================================================
-    #
-    # This makes sure people who are NOT verified can see
-    # the verification panel.
-    #
-    # The rest of the server can remain locked.
     # ========================================================
 
     try:
@@ -825,13 +874,6 @@ async def setup_error(
 
 # ============================================================
 # RENDER KEEP-ALIVE WEB SERVER
-# ============================================================
-#
-# This lets the bot listen on Render's PORT.
-#
-# It does NOT guarantee a free Render service can never restart.
-# Render can still restart/recycle services.
-#
 # ============================================================
 
 class KeepAliveHandler(BaseHTTPRequestHandler):
