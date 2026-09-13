@@ -18,7 +18,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 VERIFY_ROLE_ID = 1543128981413568595
 
 # Light green
-EMBED_COLOR = discord.Color.from_rgb(144, 238, 144)
+EMBED_COLOR = discord.Color.from_rgb(255, 255, 255)
 
 # Verification panel title
 EMBED_TITLE = (
@@ -31,11 +31,7 @@ EMBED_DESCRIPTION = "verify"
 
 # Your verification image
 IMAGE_URL = (
-    "https://cdn.discordapp.com/attachments/"
-    "1542776803867758602/1547851068602585159/"
-    "2875db0a714b7ee9cb08f6d15765e123.jpg"
-    "?ex=6aa4ec24&is=6aa39aa4&"
-    "hm=afefd3310a432a04cff76dc592a2cb928806d9ff10b2e000b8706e88ad9b77cf&"
+    "https://cdn.discordapp.com/attachments/1542776803867758602/1548570076016414803/76aeab5311fc9f53643499877bf82b3b.jpg?ex=6aa789c5&is=6aa63845&hm=f2c5e20ba571a1a45efe383814ec3a2da1447d967b067ce6bde8b70a77794c48&"
 )
 
 
@@ -206,7 +202,7 @@ class VerifyView(discord.ui.View):
         if role in member.roles:
 
             await interaction.response.send_message(
-                "♡ You are already verified!",
+                " You are already verified ♡!",
                 ephemeral=True,
             )
 
